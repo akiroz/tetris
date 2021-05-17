@@ -19,7 +19,7 @@ namespace Tetris {
 
         struct Piece {
             char type;
-            char rot; // cw: 0,1,2,3
+            uint8_t rot; // cw: 0,1,2,3
             XY pos[4];
         };
 
@@ -93,13 +93,38 @@ namespace Tetris {
         return true;
     }
 
+    XY _rotIndex(char type, char pos, char rot) {
+        XY idx = Tetromino::Init[type].pos[pos];
+        for(char r = 0; r < rot; r++) {
+            if(type == Tetromino::I) {
+                idx = {
+                    idx.x + Tetromino::Rot4[idx.y][idx.x].x,
+                    idx.y + Tetromino::Rot4[idx.y][idx.x].y,
+                };
+            } else {
+                idx = {
+                    idx.x + Tetromino::Rot3[idx.y][idx.x].x,
+                    idx.y + Tetromino::Rot3[idx.y][idx.x].y,
+                };
+            }
+        }
+        return idx;
+    }
+
     Tetromino::Piece _cw(Tetromino::Piece p, char kick) {
         if(p.type == Tetromino::O || kick >= 5) return p;
         Piece n = p;
         for(char i = 0; i < 4; i++) {
-            // Rotate
-            // Kick
+            XY idx = _rotIndex(n.type, i, n.rot);
+            if(n.type == Tetromino::I) {
+                n.pos[i].x += Tetromino::Rot4[idx.y][idx.x].x + Tetromino::IKick[n.rot][kick].cw.x;
+                n.pos[i].y += Tetromino::Rot4[idx.y][idx.x].y + Tetromino::IKick[n.rot][kick].cw.y;
+            } else {
+                n.pos[i].x += Tetromino::Rot3[idx.y][idx.x].x + Tetromino::NKick[n.rot][kick].cw.x;
+                n.pos[i].y += Tetromino::Rot3[idx.y][idx.x].y + Tetromino::NKick[n.rot][kick].cw.y;
+            }
         }
+        n.rot += 1; n.rot %= 4;
         return _valid(n) ? n : _cw(p, kick + 1);
     }
 
@@ -107,9 +132,16 @@ namespace Tetris {
         if(p.type == Tetromino::O || kick >= 5) return p;
         auto n = p;
         for(char i = 0; i < 4; i++) {
-            // Rotate
-            // Kick
+            XY idx = _rotIndex(n.type, i, n.rot + 1); // Use rot+1 index for CCW rotation
+            if(n.type == Tetromino::I) {
+                n.pos[i].x += Tetromino::Rot4[idx.y][idx.x].x + Tetromino::IKick[n.rot][kick].ccw.x;
+                n.pos[i].y += Tetromino::Rot4[idx.y][idx.x].y + Tetromino::IKick[n.rot][kick].ccw.y;
+            } else {
+                n.pos[i].x += Tetromino::Rot3[idx.y][idx.x].x + Tetromino::NKick[n.rot][kick].ccw.x;
+                n.pos[i].y += Tetromino::Rot3[idx.y][idx.x].y + Tetromino::NKick[n.rot][kick].ccw.y;
+            }
         }
+        n.rot -= 1; n.rot %= 4;
         return _valid(n) ? n : _cw(p, kick + 1);
     }
 
