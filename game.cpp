@@ -2,6 +2,9 @@
 #include <stdint.h>
 
 namespace Tetris {
+    struct XY { char x; char y; };
+    struct Kick { XY cw; XY ccw; };
+
     constexpr char fieldWidth = 10;
     constexpr char fieldHeight = 22;
 
@@ -14,8 +17,6 @@ namespace Tetris {
         constexpr char T = 5;
         constexpr char Z = 6;
 
-        struct XY { char x; char y; };
-        struct Kick { XY cw; XY ccw; };
 
         struct Piece {
             char type;
@@ -24,13 +25,13 @@ namespace Tetris {
         };
 
         // 3x3 tetromino cw rotation data
-        constexpr XY Rot3[/* y */][/* x */] = {
+        constexpr XY Rot3[3 /* y */][3 /* x */] = {
             { {+2,0}, {+1,+1}, {0,+2} },
             { {+1,-1}, {0,0}, {-1,+1} },
-            { {0,-2}, {-1,-1}, {-2,0} },
+            { {0,-2}, {-1,-1}, {-2,0} }
         };
         // 4x4 tetromino cw rotation data
-        constexpr XY Rot4[/* y */][/* x */] = {
+        constexpr XY Rot4[4 /* y */][4 /* x */] = {
             { {+3,0}, {+2,+1}, {+1,+2}, {0,+3} },
             { {+2,-1}, {+1,0}, {0,+1}, {-1,+2} },
             { {+1,-2}, {0,-1}, {-1,0}, {-2,+1} },
@@ -38,14 +39,14 @@ namespace Tetris {
         };
 
         // Normal tetromino wall kick data
-        constexpr Kick NKick[/* rotation */][/* test */] = {
+        constexpr Kick NKick[4 /* rotation */][5 /* test */] = {
             { {{0,0}, {0,0}}, {{-1,0}, {1,0}}, {{-1,1}, {1,-1}}, {{0,-2}, {0,2}}, {{-1,-2}, {1,2}} },
             { {{0,0}, {0,0}}, {{1,0}, {-1,0}}, {{1,-1}, {-1,1}}, {{0,2}, {0,-2}}, {{1,2}, {-1,-2}} },
             { {{0,0}, {0,0}}, {{1,0}, {-1,0}}, {{1,1}, {-1,-1}}, {{0,-2}, {0,2}}, {{1,-2}, {-1,2}} },
             { {{0,0}, {0,0}}, {{-1,0}, {1,0}}, {{-1,-1}, {1,1}}, {{0,2}, {0,-2}}, {{-1,2}, {1,-2}} }
         };
         // I tetromino wall kick data
-        constexpr Kick IKick[/* rotation */][/* test */] = {
+        constexpr Kick IKick[4 /* rotation */][5 /* test */] = {
             { {{0,0}, {0,0}}, {{-2,0}, {2,0}}, {{1,0}, {-1,0}}, {{-2,-1}, {2,1}}, {{1,2}, {-1,-2}} },
             { {{0,0}, {0,0}}, {{-1,0}, {1,0}}, {{2,0}, {-2,0}}, {{-1,2}, {1,-2}}, {{2,-1}, {-2,1}} },
             { {{0,0}, {0,0}}, {{2,0}, {-2,0}}, {{-1,0}, {1,0}}, {{2,1}, {-2,-1}}, {{-1,-2}, {1,2}} },
@@ -67,6 +68,7 @@ namespace Tetris {
 
     // State ===============================================
     
+    int score = 0;
     char field[fieldHeight][fieldWidth] = {};
     Tetromino::Piece piece[4] = {}; // piece[0] = current piece
 
@@ -98,13 +100,13 @@ namespace Tetris {
         for(char r = 0; r < rot; r++) {
             if(type == Tetromino::I) {
                 idx = {
-                    idx.x + Tetromino::Rot4[idx.y][idx.x].x,
-                    idx.y + Tetromino::Rot4[idx.y][idx.x].y,
+                    static_cast<char>(idx.x + Tetromino::Rot4[idx.y][idx.x].x),
+                    static_cast<char>(idx.y + Tetromino::Rot4[idx.y][idx.x].y)
                 };
             } else {
                 idx = {
-                    idx.x + Tetromino::Rot3[idx.y][idx.x].x,
-                    idx.y + Tetromino::Rot3[idx.y][idx.x].y,
+                    static_cast<char>(idx.x + Tetromino::Rot3[idx.y][idx.x].x),
+                    static_cast<char>(idx.y + Tetromino::Rot3[idx.y][idx.x].y)
                 };
             }
         }
@@ -113,7 +115,7 @@ namespace Tetris {
 
     Tetromino::Piece _cw(Tetromino::Piece p, char kick) {
         if(p.type == Tetromino::O || kick >= 5) return p;
-        Piece n = p;
+        auto n = p;
         for(char i = 0; i < 4; i++) {
             XY idx = _rotIndex(n.type, i, n.rot);
             if(n.type == Tetromino::I) {
@@ -148,19 +150,19 @@ namespace Tetris {
     Tetromino::Piece _left(Tetromino::Piece p) {
         auto n = p;
         for(char i = 0; i < 4; i++) n.pos[i].x -= 1;
-        if(_valid(n)) return n
-            return p;
+        if(_valid(n)) return n;
+        return p;
     }
 
     Tetromino::Piece _right(Tetromino::Piece p) {
         auto n = p;
         for(char i = 0; i < 4; i++) n.pos[i].x += 1;
-        if(_valid(n)) return n
-            return p;
+        if(_valid(n)) return n;
+        return p;
     }
 
     bool _drop() {
-        auto n = p;
+        auto n = piece[0];
         for(char i = 0; i < 4; i++) n.pos[i].y += 1;
         if(_valid(n)) {
             piece[0] = n;
@@ -180,19 +182,39 @@ namespace Tetris {
         }
     }
 
-    void _lockdown() {
+    bool _tetris(char y) {
+        bool tetris = true;
+        for(char x = 0; x < fieldWidth; x++) {
+            if(!field[y][x]) { tetris = false; break; }
+        }
+        return tetris;
+    }
+
+    bool _lockdown() {
         // Set current piece on field
         for(char i = 0; i < 4; i++) {
             XY p = piece[0].pos[i];
+            if(p.y < 0) return false; // Game Over
             field[p.y][p.x] = 1;
+        }
+        // Handle tetris
+        for(char y = fieldHeight - 1; y >= 0; y--) {
+            while(_tetris(y)) {
+                score++;
+                for(char y2 = y; y2 > 0; y2--) {
+                    for(char x = 0; x < fieldWidth; x++) field[y2][x] = field[y2-1][x];
+                }
+            }
         }
         // Update upcoming pieces
         for(char i = 0; i < 3; i++) piece[i] = piece[i+1];
         piece[3] = Tetromino::Init[rand() % 7];
         _spawn();
+        return true;
     }
 
     void init(uint32_t seed) {
+        score = 0;
         prng = seed;
         // Clear play field
         for(char y = 0; y < fieldHeight; y++) {
@@ -205,13 +227,16 @@ namespace Tetris {
         _spawn();
     }
 
-    void tick() { // Tick or soft drop
-        if(!_drop()) _lockdown();
+    bool tick() { // Tick or soft drop
+        if(!_drop()) {
+            return _lockdown();
+        }
+        return true;
     }
 
-    void drop() { // Hard drop
+    bool drop() { // Hard drop
         while(_drop());
-        _lockdown();
+        return _lockdown();
     }
 
     void rotate(bool ccw) {
